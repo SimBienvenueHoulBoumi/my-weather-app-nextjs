@@ -1,101 +1,141 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { Weather } from "@/utils/weatherType";
+import { getCustomWeather, getCurrentFormattedDate } from "@/services/weather";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [weather, setWeather] = useState<Weather | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentHourWeather, setCurrentHourWeather] = useState<{
+    time: string;
+    temperature: number;
+    windSpeed: number;
+  } | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+  const [selectedCity, setSelectedCity] = useState("Berlin");
+
+  const [loaderFinished, setLoaderFinished] = useState(false);
+
+  const locations = useMemo(
+    () => [
+      { name: "Berlin", latitude: 52.52, longitude: 13.41 },
+      { name: "Paris", latitude: 48.8566, longitude: 2.3522 },
+      { name: "New York", latitude: 40.7128, longitude: -74.006 },
+      { name: "Tokyo", latitude: 35.6762, longitude: 139.6503 },
+    ],
+    []
+  );
+
+  const selectedLocation = useMemo(
+    () => locations.find((loc) => loc.name === selectedCity),
+    [selectedCity, locations]
+  );
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      if (!selectedLocation) return;
+
+      setLoading(true);
+
+      try {
+        const weatherData = await getCustomWeather(
+          selectedLocation.latitude,
+          selectedLocation.longitude
+        );
+
+        if (!weatherData) {
+          setWeather(null);
+          setCurrentHourWeather(null);
+          setLoading(false);
+          return;
+        }
+
+        setWeather(weatherData);
+
+        const currentHour = getCurrentFormattedDate();
+        const index = weatherData.hourly.time.findIndex((time) =>
+          time.startsWith(currentHour)
+        );
+
+        if (index !== -1) {
+          setCurrentHourWeather({
+            time: weatherData.hourly.time[index],
+            temperature: weatherData.hourly.temperature_2m[index],
+            windSpeed: weatherData.hourly.wind_speed_10m[index],
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch weather data:", error);
+        setWeather(null);
+        setCurrentHourWeather(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeather();
+
+    const loaderTimer = setTimeout(() => {
+      setLoaderFinished(true);
+    }, 3000);
+
+    return () => clearTimeout(loaderTimer);
+  }, [selectedLocation]);
+
+  const handleLocationChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    setSelectedCity(event.target.value);
+    setLoaderFinished(false);
+  };
+
+  if (loading || !loaderFinished) {
+    return (
+      <div className="loader-container">
+        <div className="loader"></div>
+      </div>
+    );
+  }
+
+  if (!weather || !currentHourWeather) {
+    return <div>Failed to load weather data</div>;
+  }
+
+  return (
+    <div className="flex flex-col justify-center items-center min-h-screen">
+      {/* Select pour choisir la localisation */}
+      <div className="mb-4">
+        <label htmlFor="location-select" className="mr-2">
+          Choose a location:
+        </label>
+        <select
+          id="location-select"
+          onChange={handleLocationChange}
+          className="p-2 border rounded-md"
+          value={selectedCity}
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          {locations.map((loc) => (
+            <option key={loc.name} value={loc.name}>
+              {loc.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Affichage des données météo de l'heure actuelle */}
+      <div className="bg-white m-2 p-2 rounded-sm w-1/3 text-center">
+        <h2>Weather for {selectedCity}</h2>
+        <p>
+          <strong>Time:</strong> {currentHourWeather.time}
+        </p>
+        <p>
+          <strong>Temperature:</strong> {currentHourWeather.temperature}°C
+        </p>
+        <p>
+          <strong>Wind Speed:</strong> {currentHourWeather.windSpeed} m/s
+        </p>
+      </div>
     </div>
   );
 }
