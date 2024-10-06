@@ -1,8 +1,20 @@
-// src/services/apiService.ts
+"use server"
 
-const REST_COUNTRIES_URL = "https://restcountries.com/v3.1/all";
-const GEO_API_URL = "https://api.opencagedata.com/geocode/v1/json";
-const API_KEY = "5831efb20ee34286ba7f708a5c966a0a"; 
+const REST_COUNTRIES_URL = process.env.NEXT_PUBLIC_REST_COUNTRIES_URL;
+const GEO_API_URL = process.env.NEXT_PUBLIC_GEO_API_URL;
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY; 
+
+if (!REST_COUNTRIES_URL) {
+  throw new Error("REST_COUNTRIES_URL is not defined");
+}
+
+if (!GEO_API_URL) {
+  throw new Error("GEO_API_URL is not defined");
+}
+
+if (!API_KEY) {
+  throw new Error("API_KEY is not defined");
+}
 
 export const fetchCountries = async () => {
   try {
