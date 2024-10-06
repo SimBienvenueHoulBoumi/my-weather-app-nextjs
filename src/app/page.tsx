@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Weather } from "@/utils/weatherType";
+import { useState, useEffect, useMemo } from "react";
+
 import { getCustomWeather, getCurrentFormattedDate } from "@/services/weather";
+import { fetchCountries, fetchCoordinates } from "@/services/countries";
+
+import LocationSelect from "@/components/LocationSelect";
+import WeatherDisplay from "@/components/WeatherDisplay";
+import Loader from "@/components/Loader";
 
 export default function Home() {
-  const [weather, setWeather] = useState<Weather | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [countries, setCountries] = useState<any[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string>("France");
   const [currentHourWeather, setCurrentHourWeather] = useState<{
     time: string;
     temperature: number;
     windSpeed: number;
   } | null>(null);
-
-  const [selectedCity, setSelectedCity] = useState("Berlin");
-
+  const [loading, setLoading] = useState(true);
   const [loaderFinished, setLoaderFinished] = useState(false);
 
-  const locations = useMemo(
-    () => [
-      { name: "Berlin", latitude: 52.52, longitude: 13.41 },
-      { name: "Paris", latitude: 48.8566, longitude: 2.3522 },
-      { name: "New York", latitude: 40.7128, longitude: -74.006 },
-      { name: "Tokyo", latitude: 35.6762, longitude: 139.6503 },
-    ],
-    []
-  );
+  useEffect(() => {
+    const fetchCountryData = async () => {
+      const countryData = await fetchCountries();
+      setCountries(countryData);
+
+      if (countryData.find((country: any) => country.name === "France")) {
+        setSelectedCity("France");
+      }
+
+      setLoading(false);
+    };
+
+    fetchCountryData();
+  }, []);
 
   const selectedLocation = useMemo(
-    () => locations.find((loc) => loc.name === selectedCity),
-    [selectedCity, locations]
+    () => countries.find((loc) => loc.name === selectedCity),
+    [selectedCity, countries]
   );
 
   useEffect(() => {
@@ -38,20 +46,23 @@ export default function Home() {
 
       setLoading(true);
 
+      const coordinates = await fetchCoordinates(selectedLocation.name);
+      if (!coordinates) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const weatherData = await getCustomWeather(
-          selectedLocation.latitude,
-          selectedLocation.longitude
+          coordinates.lat,
+          coordinates.lng
         );
 
         if (!weatherData) {
-          setWeather(null);
           setCurrentHourWeather(null);
           setLoading(false);
           return;
         }
-
-        setWeather(weatherData);
 
         const currentHour = getCurrentFormattedDate();
         const index = weatherData.hourly.time.findIndex((time) =>
@@ -67,7 +78,6 @@ export default function Home() {
         }
       } catch (error) {
         console.error("Failed to fetch weather data:", error);
-        setWeather(null);
         setCurrentHourWeather(null);
       } finally {
         setLoading(false);
@@ -75,67 +85,28 @@ export default function Home() {
     };
 
     fetchWeather();
-
-    const loaderTimer = setTimeout(() => {
-      setLoaderFinished(true);
-    }, 3000);
-
-    return () => clearTimeout(loaderTimer);
   }, [selectedLocation]);
 
-  const handleLocationChange = (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    setSelectedCity(event.target.value);
+  const handleLocationChange = (city: string) => {
+    setSelectedCity(city);
     setLoaderFinished(false);
   };
 
-  if (loading || !loaderFinished) {
-    return (
-      <div className="loader-container">
-        <div className="loader"></div>
-      </div>
-    );
-  }
-
-  if (!weather || !currentHourWeather) {
-    return <div>Failed to load weather data</div>;
+  if (loading) {
+    return <Loader />;
   }
 
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen">
-      {/* Select pour choisir la localisation */}
-      <div className="mb-4">
-        <label htmlFor="location-select" className="mr-2">
-          Choose a location:
-        </label>
-        <select
-          id="location-select"
-          onChange={handleLocationChange}
-          className="p-2 border rounded-md"
-          value={selectedCity}
-        >
-          {locations.map((loc) => (
-            <option key={loc.name} value={loc.name}>
-              {loc.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Affichage des données météo de l'heure actuelle */}
-      <div className="bg-white m-2 p-2 rounded-sm w-1/3 text-center">
-        <h2>Weather for {selectedCity}</h2>
-        <p>
-          <strong>Time:</strong> {currentHourWeather.time}
-        </p>
-        <p>
-          <strong>Temperature:</strong> {currentHourWeather.temperature}°C
-        </p>
-        <p>
-          <strong>Wind Speed:</strong> {currentHourWeather.windSpeed} m/s
-        </p>
-      </div>
+    <div className="flex flex-col justify-center items-center min-h-screen w-[320px] space-y-2">
+      <LocationSelect
+        locations={countries}
+        selectedCity={selectedCity}
+        onChange={handleLocationChange}
+      />
+      <WeatherDisplay
+        selectedCity={selectedCity}
+        weatherData={currentHourWeather}
+      />
     </div>
   );
 }
